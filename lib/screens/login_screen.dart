@@ -133,8 +133,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   /// Bypass scan for local development/simulator testing
   void _bypassScan() async {
-    // Format: LANKAGO:USER:id:name:email:balance:dailySpent:dailyCap:status:cardNumber
-    const mockPayload = 'LANKAGO:USER:usr_001:Kamal Silva:kamal.silva@lankago.lk:150.00:40.00:100.00:Active:LK-GO-1092-8472';
+    // Format: LANKAGO:USER:id:name:email:balance:phone:status:accountType:cardNumber
+    const mockPayload = 'LANKAGO:USER:usr_001:Kamal Silva:kamal.silva@lankago.lk:150.00:0771234567:active:regular:LK-GO-1092-8472';
     
     showDialog(
       context: context,

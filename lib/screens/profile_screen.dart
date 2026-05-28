@@ -22,6 +22,8 @@ class ProfileScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final isFrozen = user.status == 'frozen';
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
@@ -68,12 +70,12 @@ class ProfileScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: user.isFrozen ? Colors.red : const Color(0xFF00F2FE),
+                        color: isFrozen ? Colors.red : const Color(0xFF00F2FE),
                         width: 3,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: user.isFrozen ? Colors.red.withAlpha(50) : const Color(0xFF00F2FE).withAlpha(50),
+                          color: isFrozen ? Colors.red.withAlpha(50) : const Color(0xFF00F2FE).withAlpha(50),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -85,7 +87,7 @@ class ProfileScreen extends StatelessWidget {
                       child: Text(
                         user.name.isNotEmpty ? user.name[0] : 'U',
                         style: GoogleFonts.outfit(
-                          color: user.isFrozen ? Colors.red : const Color(0xFF00F2FE),
+                          color: isFrozen ? Colors.red : const Color(0xFF00F2FE),
                           fontWeight: FontWeight.bold,
                           fontSize: 42,
                         ),
@@ -148,22 +150,28 @@ class ProfileScreen extends StatelessWidget {
                         // Card Status
                         _buildProfileField(
                           label: langProvider.translate('cardStatus'),
-                          value: langProvider.translate(user.status.toLowerCase()),
+                          value: isFrozen ? 'Card Frozen' : 'Card Active',
                           icon: Icons.check_circle_outline,
-                          valueColor: user.status.toLowerCase() == 'active'
-                              ? const Color(0xFF00E676)
-                              : Colors.redAccent,
+                          valueColor: isFrozen ? Colors.redAccent : const Color(0xFF00E676),
                         ),
                         Divider(color: Colors.white.withAlpha(15), height: 32),
 
                         // Classification Type (Student/Standard)
                         _buildProfileField(
                           label: 'Passenger Classification',
-                          value: user.userType,
+                          value: user.accountType.toUpperCase(),
                           icon: Icons.assignment_ind_outlined,
-                          valueColor: user.userType == 'Student'
+                          valueColor: user.accountType == 'student'
                               ? const Color(0xFFFFB300)
                               : Colors.white,
+                        ),
+                        Divider(color: Colors.white.withAlpha(15), height: 32),
+
+                        // Phone Number
+                        _buildProfileField(
+                          label: 'Phone Contact',
+                          value: user.phone,
+                          icon: Icons.phone_android_outlined,
                         ),
                         Divider(color: Colors.white.withAlpha(15), height: 32),
 
@@ -173,7 +181,7 @@ class ProfileScreen extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.ac_unit, color: user.isFrozen ? Colors.red : Colors.white54, size: 20),
+                                Icon(Icons.ac_unit, color: isFrozen ? Colors.red : Colors.white54, size: 20),
                                 const SizedBox(width: 14),
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -188,9 +196,9 @@ class ProfileScreen extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      user.isFrozen ? 'Card Frozen' : 'Card Active',
+                                      isFrozen ? 'Card Frozen' : 'Card Active',
                                       style: GoogleFonts.inter(
-                                        color: user.isFrozen ? Colors.red : Colors.white,
+                                        color: isFrozen ? Colors.red : Colors.white,
                                         fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -200,7 +208,7 @@ class ProfileScreen extends StatelessWidget {
                               ],
                             ),
                             Switch(
-                              value: user.isFrozen,
+                              value: isFrozen,
                               activeThumbColor: Colors.red,
                               onChanged: (val) {
                                 authProvider.setFreezeState(val);

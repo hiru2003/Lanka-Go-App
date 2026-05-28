@@ -30,7 +30,7 @@ class OfflineSyncService {
     required String routeName,
   }) {
     // 1. Verify Card Status (Stolen/Frozen card detection)
-    if (user.isFrozen) {
+    if (user.status == 'frozen') {
       return OfflineValidationResult(
         isValid: false,
         rejectionReason: 'Card Frozen. Scan Rejected.',
@@ -46,7 +46,7 @@ class OfflineSyncService {
 
     // 2. Calculate Fare (Student Discount: 50% off)
     double finalFare = baseFare;
-    if (user.userType == 'Student') {
+    if (user.accountType == 'student') {
       finalFare = baseFare * 0.5; // 50% discount
     }
 
@@ -61,9 +61,11 @@ class OfflineSyncService {
     // 4. Create local offline transaction
     final offlineTransaction = TransactionModel(
       id: 'tx_off_${DateTime.now().millisecondsSinceEpoch}',
+      userId: user.id,
+      type: 'travel',
+      amount: -finalFare,
+      timestamp: DateTime.now().toIso8601String(),
       route: routeName,
-      fare: finalFare,
-      timestamp: DateTime.now(),
       busId: busId,
       isOffline: true,
       isSynced: false,

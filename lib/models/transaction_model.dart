@@ -1,36 +1,44 @@
 class TransactionModel {
   final String id;
-  final String route;
-  final double fare;
-  final DateTime timestamp;
-  final String busId;
-  final bool isOffline;
-  final bool isSynced;
+  final String userId;
+  final String type; // "reload" | "travel" | "travel_capped"
+  final double amount; // negative for travel, positive for reloads
+  final String timestamp; // ISO 8601 String
+  final String route; // helper for display
+  final String busId; // helper for display
+  final bool isOffline; // helper for local tracking
+  final bool isSynced; // helper for local tracking
 
   TransactionModel({
     required this.id,
-    required this.route,
-    required this.fare,
+    required this.userId,
+    required this.type,
+    required this.amount,
     required this.timestamp,
-    required this.busId,
+    this.route = '',
+    this.busId = '',
     this.isOffline = false,
     this.isSynced = true,
   });
 
   TransactionModel copyWith({
     String? id,
+    String? userId,
+    String? type,
+    double? amount,
+    String? timestamp,
     String? route,
-    double? fare,
-    DateTime? timestamp,
     String? busId,
     bool? isOffline,
     bool? isSynced,
   }) {
     return TransactionModel(
       id: id ?? this.id,
-      route: route ?? this.route,
-      fare: fare ?? this.fare,
+      userId: userId ?? this.userId,
+      type: type ?? this.type,
+      amount: amount ?? this.amount,
       timestamp: timestamp ?? this.timestamp,
+      route: route ?? this.route,
       busId: busId ?? this.busId,
       isOffline: isOffline ?? this.isOffline,
       isSynced: isSynced ?? this.isSynced,
@@ -40,24 +48,28 @@ class TransactionModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'user_id': userId,
+      'type': type,
+      'amount': amount,
+      'timestamp': timestamp,
       'route': route,
-      'fare': fare,
-      'timestamp': timestamp.toIso8601String(),
-      'busId': busId,
-      'isOffline': isOffline,
-      'isSynced': isSynced,
+      'bus_id': busId,
+      'is_offline': isOffline ? 1 : 0,
+      'is_synced': isSynced ? 1 : 0,
     };
   }
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
     return TransactionModel(
-      id: json['id'],
-      route: json['route'],
-      fare: json['fare'],
-      timestamp: DateTime.parse(json['timestamp']),
-      busId: json['busId'],
-      isOffline: json['isOffline'] ?? false,
-      isSynced: json['isSynced'] ?? true,
+      id: json['id'] ?? '',
+      userId: json['user_id'] ?? '',
+      type: json['type'] ?? 'travel',
+      amount: (json['amount'] ?? 0.0).toDouble(),
+      timestamp: json['timestamp'] ?? '',
+      route: json['route'] ?? '',
+      busId: json['bus_id'] ?? '',
+      isOffline: json['is_offline'] == 1 || (json['isOffline'] ?? false),
+      isSynced: json['is_synced'] == 1 || (json['isSynced'] ?? true),
     );
   }
 }

@@ -4,9 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 
 import 'providers/auth_provider.dart';
 import 'providers/language_provider.dart';
+import 'providers/bus_routes_provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/reload_screen.dart';
+import 'screens/routes_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +25,7 @@ class LankaGoApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()),
+        ChangeNotifierProvider(create: (_) => BusRoutesProvider()),
       ],
       child: MaterialApp(
       title: 'Lanka Go',
@@ -69,6 +73,8 @@ class LankaGoApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/profile': (context) => const ProfileScreen(),
+        '/reload': (context) => const ReloadScreen(),
+        '/routes': (context) => const RoutesScreen(),
       },
     ),
   );

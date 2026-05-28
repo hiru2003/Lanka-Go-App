@@ -3,45 +3,44 @@ class UserModel {
   final String name;
   final String email;
   final double balance;
-  final double dailySpent;
-  final double dailyCap;
-  final String status; // 'Active' or 'Suspended'
+  final String phone;
+  final String status; // "active" | "frozen"
+  final String accountType; // "regular" | "student"
   final String cardNumber;
-  final String userType; // 'Student' or 'Standard'
-  final bool isFrozen;
+  final List<String> routesHistory;
 
   UserModel({
     required this.id,
     required this.name,
     required this.email,
     required this.balance,
-    required this.dailySpent,
-    required this.dailyCap,
+    required this.phone,
     required this.status,
+    required this.accountType,
     required this.cardNumber,
-    this.userType = 'Standard',
-    this.isFrozen = false,
+    required this.routesHistory,
   });
 
   /// Factory constructor to parse a UserModel from a scanned QR payload.
-  /// Payload format: LANKAGO:USER:id:name:email:balance:dailySpent:dailyCap:status:cardNumber:userType:isFrozen
+  /// Payload format: LANKAGO:USER:id:name:email:balance:phone:status:accountType:cardNumber:routesHistoryRefs
   factory UserModel.fromQRString(String qrString) {
     final parts = qrString.split(':');
     if (parts.length < 10) {
       throw const FormatException('Invalid QR Payload format');
     }
 
+    final historyParts = parts.length > 10 ? parts[10].split(',') : <String>[];
+
     return UserModel(
       id: parts[2],
       name: parts[3],
       email: parts[4],
       balance: double.tryParse(parts[5]) ?? 0.0,
-      dailySpent: double.tryParse(parts[6]) ?? 0.0,
-      dailyCap: double.tryParse(parts[7]) ?? 100.0,
-      status: parts[8],
+      phone: parts[6],
+      status: parts[7],
+      accountType: parts[8],
       cardNumber: parts[9],
-      userType: parts.length > 10 ? parts[10] : 'Standard',
-      isFrozen: parts.length > 11 ? (parts[11] == 'true') : false,
+      routesHistory: historyParts.where((s) => s.isNotEmpty).toList(),
     );
   }
 
@@ -51,24 +50,22 @@ class UserModel {
     String? name,
     String? email,
     double? balance,
-    double? dailySpent,
-    double? dailyCap,
+    String? phone,
     String? status,
+    String? accountType,
     String? cardNumber,
-    String? userType,
-    bool? isFrozen,
+    List<String>? routesHistory,
   }) {
     return UserModel(
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
       balance: balance ?? this.balance,
-      dailySpent: dailySpent ?? this.dailySpent,
-      dailyCap: dailyCap ?? this.dailyCap,
+      phone: phone ?? this.phone,
       status: status ?? this.status,
+      accountType: accountType ?? this.accountType,
       cardNumber: cardNumber ?? this.cardNumber,
-      userType: userType ?? this.userType,
-      isFrozen: isFrozen ?? this.isFrozen,
+      routesHistory: routesHistory ?? this.routesHistory,
     );
   }
 
@@ -78,12 +75,25 @@ class UserModel {
       'name': name,
       'email': email,
       'balance': balance,
-      'dailySpent': dailySpent,
-      'dailyCap': dailyCap,
+      'phone': phone,
       'status': status,
+      'accountType': accountType,
       'cardNumber': cardNumber,
-      'userType': userType,
-      'isFrozen': isFrozen,
+      'routes_history': routesHistory,
     };
+  }
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      balance: (json['balance'] ?? 0.0).toDouble(),
+      phone: json['phone'] ?? '',
+      status: json['status'] ?? 'active',
+      accountType: json['accountType'] ?? 'regular',
+      cardNumber: json['cardNumber'] ?? '',
+      routesHistory: List<String>.from(json['routes_history'] ?? []),
+    );
   }
 }

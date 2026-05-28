@@ -10,128 +10,7 @@ import '../models/transaction_model.dart';
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  /// Displays the reload bottom sheet modal
-  void _showReloadModal(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1E293B),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(28),
-          topRight: Radius.circular(28),
-        ),
-      ),
-      builder: (context) {
-        final List<double> reloadAmounts = [100, 200, 500, 1000];
-
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.white24,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  langProvider.translate('reloadBalance'),
-                  style: GoogleFonts.outfit(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Simulated online payment gateway deposit. Enter reload amount to proceed.',
-                  style: GoogleFonts.inter(
-                    color: Colors.white60,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Grid of reload amounts
-                GridView.count(
-                  shrinkWrap: true,
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 2.2,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: reloadAmounts.map((amount) {
-                    return InkWell(
-                      onTap: () async {
-                        Navigator.pop(context);
-                        
-                        // Show simulated payment loader
-                        showDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          builder: (context) => const Center(
-                            child: CircularProgressIndicator(color: Color(0xFF00F2FE)),
-                          ),
-                        );
-
-                        final success = await authProvider.reloadBalanceWithGateway(amount);
-                        
-                        if (context.mounted) {
-                          Navigator.pop(context); // Dismiss loader
-                        }
-
-                        if (success && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                'Payment Successful! Reloaded ${langProvider.translate('lkr')} ${amount.toStringAsFixed(2)} to card.',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              backgroundColor: const Color(0xFF00E676),
-                            ),
-                          );
-                        }
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(10),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white.withAlpha(20)),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          '${langProvider.translate('lkr')} ${amount.toStringAsFixed(0)}',
-                          style: GoogleFonts.shareTechMono(
-                            color: const Color(0xFF00F2FE),
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// Displays the travel history timeline list
+  /// Displays the recent travel history popup list
   void _showHistoryModal(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final langProvider = Provider.of<LanguageProvider>(context, listen: false);
@@ -205,7 +84,11 @@ class DashboardScreen extends StatelessWidget {
                                       color: Colors.white.withAlpha(10),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(Icons.directions_bus, color: Color(0xFF00F2FE), size: 20),
+                                    child: Icon(
+                                      trip.type == 'reload' ? Icons.add_card : Icons.directions_bus,
+                                      color: trip.type == 'reload' ? const Color(0xFF00E676) : const Color(0xFF00F2FE),
+                                      size: 20,
+                                    ),
                                   ),
                                   const SizedBox(width: 14),
                                   Column(
@@ -237,9 +120,9 @@ class DashboardScreen extends StatelessWidget {
                                 ],
                               ),
                               Text(
-                                '- ${langProvider.translate('lkr')} ${trip.fare.toStringAsFixed(2)}',
+                                '${trip.amount > 0 ? "+" : ""} ${langProvider.translate('lkr')} ${trip.amount.toStringAsFixed(2)}',
                                 style: GoogleFonts.shareTechMono(
-                                  color: const Color(0xFFFFB300),
+                                  color: trip.amount > 0 ? const Color(0xFF00E676) : const Color(0xFFFFB300),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 15,
                                 ),
@@ -319,8 +202,8 @@ class DashboardScreen extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    final double capProgress = (user.dailySpent / user.dailyCap).clamp(0.0, 1.0);
-    final isCapReached = user.dailySpent >= user.dailyCap;
+    final double capProgress = (authProvider.dailySpent / authProvider.dailyCap).clamp(0.0, 1.0);
+    final isCapReached = authProvider.dailySpent >= authProvider.dailyCap;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -426,7 +309,7 @@ class DashboardScreen extends StatelessWidget {
                   
                   const SizedBox(height: 20),
 
-                  // 1. LOW BALANCE NOTIFICATION SYSTEM
+                  // 1. LOW BALANCE NOTIFICATION SYSTEM (< LKR 50 safety threshold)
                   if (authProvider.isLowBalance)
                     Container(
                       margin: const EdgeInsets.only(bottom: 20),
@@ -456,7 +339,7 @@ class DashboardScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Your balance is below LKR 100.00. Please reload.',
+                                  'Your balance is below LKR 50.00 safety threshold.',
                                   style: GoogleFonts.inter(color: Colors.white70, fontSize: 11),
                                 ),
                               ],
@@ -469,7 +352,7 @@ class DashboardScreen extends StatelessWidget {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
-                            onPressed: () => _showReloadModal(context),
+                            onPressed: () => Navigator.pushNamed(context, '/reload'),
                             child: const Text('RELOAD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
                           ),
                         ],
@@ -510,7 +393,7 @@ class DashboardScreen extends StatelessWidget {
                                   ),
                                   
                                   // User Type student tag
-                                  if (user.userType == 'Student')
+                                  if (user.accountType == 'student')
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
@@ -607,8 +490,8 @@ class DashboardScreen extends StatelessWidget {
                         ),
                       ),
                       
-                      // 2. FREEZE CARD BLOCKED OVERLAY SHIELD
-                      if (user.isFrozen)
+                      // FREEZE CARD BLOCKED OVERLAY SHIELD
+                      if (user.status == 'frozen')
                         Positioned.fill(
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(24),
@@ -643,7 +526,7 @@ class DashboardScreen extends StatelessWidget {
 
                   const SizedBox(height: 20),
 
-                  // Daily Cap Progress Widget
+                  // Daily Cap Progress Widget (Capped at LKR 100.00 spent)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20.0),
@@ -673,7 +556,7 @@ class DashboardScreen extends StatelessWidget {
                               ],
                             ),
                             Text(
-                              '${langProvider.translate('lkr')} ${user.dailySpent.toStringAsFixed(0)} / ${user.dailyCap.toStringAsFixed(0)}',
+                              '${langProvider.translate('lkr')} ${authProvider.dailySpent.toStringAsFixed(0)} / ${authProvider.dailyCap.toStringAsFixed(0)}',
                               style: GoogleFonts.shareTechMono(
                                 color: Colors.white70,
                                 fontSize: 14,
@@ -705,8 +588,8 @@ class DashboardScreen extends StatelessWidget {
                         const SizedBox(height: 10),
                         Text(
                           isCapReached
-                              ? 'Daily capping reached! Your transit trips are free for today.'
-                              : '${langProvider.translate('lkr')} ${(user.dailyCap - user.dailySpent).toStringAsFixed(2)} remaining before daily cap discount triggers.',
+                              ? 'Daily capping reached! subsequent travel fares capped to LKR 0.00.'
+                              : '${langProvider.translate('lkr')} ${(authProvider.dailyCap - authProvider.dailySpent).toStringAsFixed(2)} remaining before daily cap discount triggers.',
                           style: GoogleFonts.inter(
                             color: isCapReached ? const Color(0xFF00E676) : Colors.white38,
                             fontSize: 11,
@@ -718,7 +601,7 @@ class DashboardScreen extends StatelessWidget {
 
                   const SizedBox(height: 24),
 
-                  // 3. INTERACTIVE DEVELOPER TESTING PANEL
+                  // INTERACTIVE DEVELOPER TESTING PANEL (SQLite / Double scans simulator)
                   _buildDevTestingPanel(context, authProvider, user),
 
                   const SizedBox(height: 28),
@@ -745,17 +628,17 @@ class DashboardScreen extends StatelessWidget {
                           label: langProvider.translate('reloadBalance'),
                           icon: Icons.add_card,
                           color: const Color(0xFF00F2FE),
-                          onTap: () => _showReloadModal(context),
+                          onTap: () => Navigator.pushNamed(context, '/reload'),
                         ),
                       ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: _buildActionTile(
                           context: context,
-                          label: langProvider.translate('travelHistory'),
-                          icon: Icons.history,
+                          label: 'Bus ETAs & Routes',
+                          icon: Icons.navigation_outlined,
                           color: const Color(0xFFFFB300),
-                          onTap: () => _showHistoryModal(context),
+                          onTap: () => Navigator.pushNamed(context, '/routes'),
                         ),
                       ),
                     ],
@@ -763,13 +646,28 @@ class DashboardScreen extends StatelessWidget {
                   
                   const SizedBox(height: 16),
                   
-                  _buildActionTile(
-                    context: context,
-                    label: langProvider.translate('profile'),
-                    icon: Icons.person_outline,
-                    color: Colors.white,
-                    isFullWidth: true,
-                    onTap: () => Navigator.pushNamed(context, '/profile'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildActionTile(
+                          context: context,
+                          label: langProvider.translate('travelHistory'),
+                          icon: Icons.history,
+                          color: Colors.white,
+                          onTap: () => _showHistoryModal(context),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _buildActionTile(
+                          context: context,
+                          label: langProvider.translate('profile'),
+                          icon: Icons.person_outline,
+                          color: Colors.white,
+                          onTap: () => Navigator.pushNamed(context, '/profile'),
+                        ),
+                      ),
+                    ],
                   ),
 
                   const SizedBox(height: 32),
@@ -784,8 +682,6 @@ class DashboardScreen extends StatelessWidget {
 
   /// Builds the visual testing panel widget allowing quick switches of states
   Widget _buildDevTestingPanel(BuildContext context, AuthProvider authProvider, UserModel user) {
-    final unsyncedCount = authProvider.offlineService.unsyncedCount;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -801,7 +697,7 @@ class DashboardScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'CORE USE CASE SIMULATOR',
+                'LANKA GO SIMULATOR',
                 style: GoogleFonts.outfit(
                   color: const Color(0xFF00F2FE),
                   fontSize: 13,
@@ -809,18 +705,32 @@ class DashboardScreen extends StatelessWidget {
                   letterSpacing: 1.5,
                 ),
               ),
-              if (unsyncedCount > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withAlpha(45),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$unsyncedCount Unsynced',
-                    style: const TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                ),
+              // SQLite Cache Counter out of 500 limit
+              FutureBuilder<int>(
+                future: authProvider.sqliteService.getUnsyncedCount(),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: count >= 500 
+                          ? Colors.red.withAlpha(45) 
+                          : (count > 0 ? Colors.orange.withAlpha(45) : Colors.white10),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'SQLite: $count / 500',
+                      style: TextStyle(
+                        color: count >= 500 
+                            ? Colors.red 
+                            : (count > 0 ? Colors.orange : Colors.white54),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -829,7 +739,7 @@ class DashboardScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // 1. Connection toggle
+              // Connection toggle
               _buildDevToggle(
                 label: 'Network',
                 value: authProvider.isOnline ? 'Online' : 'Offline',
@@ -837,20 +747,20 @@ class DashboardScreen extends StatelessWidget {
                 onTap: () => authProvider.setNetworkState(!authProvider.isOnline),
               ),
               
-              // 2. Student type toggle
+              // Student type toggle
               _buildDevToggle(
-                label: 'Type',
-                value: user.userType,
-                activeColor: user.userType == 'Student' ? const Color(0xFFFFB300) : Colors.white,
+                label: 'Account Type',
+                value: user.accountType,
+                activeColor: user.accountType == 'student' ? const Color(0xFFFFB300) : Colors.white,
                 onTap: () => authProvider.toggleUserType(),
               ),
 
-              // 3. Freeze toggle
+              // Freeze toggle
               _buildDevToggle(
-                label: 'Freeze Card',
-                value: user.isFrozen ? 'Frozen' : 'Active',
-                activeColor: user.isFrozen ? Colors.red : const Color(0xFF00E676),
-                onTap: () => authProvider.setFreezeState(!user.isFrozen),
+                label: 'Card Lock',
+                value: user.status == 'frozen' ? 'Locked' : 'Active',
+                activeColor: user.status == 'frozen' ? Colors.red : const Color(0xFF00E676),
+                onTap: () => authProvider.setFreezeState(user.status != 'frozen'),
               ),
             ],
           ),
@@ -875,13 +785,14 @@ class DashboardScreen extends StatelessWidget {
                     // Try processing trip with standard cost LKR 50.00
                     final success = authProvider.processBusTrip(
                       baseFare: 50.0,
-                      routeName: 'Route 138 - Pettah to Maharagama',
+                      routeName: '138 Pettah-Borella',
                       busId: 'LK-NC-4829',
+                      context: context,
                     );
                     
                     if (success) {
-                      final double charge = user.userType == 'Student' ? 25.0 : 50.0;
-                      final modeStr = authProvider.isOnline ? 'Online' : 'Offline validator';
+                      final double charge = user.accountType == 'student' ? 25.0 : 50.0;
+                      final modeStr = authProvider.isOnline ? 'Online Server' : 'Local SQLite';
                       ScaffoldMessenger.of(context).hideCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -894,8 +805,17 @@ class DashboardScreen extends StatelessWidget {
                       );
                     } else {
                       String failReason = 'Transaction rejected: insufficient balance.';
-                      if (user.isFrozen) {
+                      if (user.status == 'frozen') {
                         failReason = 'Transaction rejected: card is frozen!';
+                      } else {
+                        // Check if duplicate timeout occurred
+                        final now = DateTime.now();
+                        final lastScan = authProvider.travelHistory.isEmpty 
+                            ? null 
+                            : DateTime.parse(authProvider.travelHistory.first.timestamp);
+                        if (lastScan != null && now.difference(lastScan) < const Duration(minutes: 1)) {
+                          failReason = 'Duplicate scan blocked (1-min timeout protection)';
+                        }
                       }
                       ScaffoldMessenger.of(context).hideCurrentSnackBar();
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -912,53 +832,60 @@ class DashboardScreen extends StatelessWidget {
               ),
               
               // Force synchronization button
-              if (unsyncedCount > 0) ...[
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E676).withAlpha(30),
-                    foregroundColor: const Color(0xFF00E676),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: const BorderSide(color: Color(0xFF00E676)),
+              FutureBuilder<int>(
+                future: authProvider.sqliteService.getUnsyncedCount(),
+                builder: (context, snapshot) {
+                  final count = snapshot.data ?? 0;
+                  if (count == 0) return const SizedBox();
+
+                  return Padding(
+                    padding: const EdgeInsets.only(left: 12.0),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00E676).withAlpha(30),
+                        foregroundColor: const Color(0xFF00E676),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: Color(0xFF00E676)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
+                      onPressed: !authProvider.isOnline 
+                          ? () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cannot sync: connection is offline.'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          : () async {
+                              showDialog(
+                                context: context,
+                                barrierDismissible: false,
+                                builder: (context) => const Center(
+                                  child: CircularProgressIndicator(color: Color(0xFF00E676)),
+                                ),
+                              );
+                              
+                              await authProvider.syncOfflineTransactions();
+                              
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Sync Complete! Offline queue uploaded to server.'),
+                                    backgroundColor: Color(0xFF00E676),
+                                  ),
+                                );
+                              }
+                            },
+                      icon: const Icon(Icons.cloud_sync_outlined, size: 16),
+                      label: const Text('Sync', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  ),
-                  onPressed: !authProvider.isOnline 
-                      ? () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Cannot sync: connection is offline.'),
-                              backgroundColor: Colors.redAccent,
-                            ),
-                          );
-                        }
-                      : () async {
-                          // Show sync indicator dialog
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (context) => const Center(
-                              child: CircularProgressIndicator(color: Color(0xFF00E676)),
-                            ),
-                          );
-                          
-                          await authProvider.syncOfflineTransactions();
-                          
-                          if (context.mounted) {
-                            Navigator.pop(context); // Dismiss loader
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Sync Complete! Unsynced offline logs uploaded to server.'),
-                                backgroundColor: Color(0xFF00E676),
-                              ),
-                            );
-                          }
-                        },
-                  icon: const Icon(Icons.cloud_sync_outlined, size: 16),
-                  label: const Text('Sync Logs', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                ),
-              ],
+                  );
+                },
+              ),
             ],
           ),
         ],
@@ -1006,13 +933,12 @@ class DashboardScreen extends StatelessWidget {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
-    bool isFullWidth = false,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        height: isFullWidth ? 64 : 96,
+        height: 80,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: Colors.white.withAlpha(6),
@@ -1020,7 +946,7 @@ class DashboardScreen extends StatelessWidget {
           border: Border.all(color: Colors.white.withAlpha(12)),
         ),
         child: Row(
-          mainAxisAlignment: isFullWidth ? MainAxisAlignment.start : MainAxisAlignment.center,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
@@ -1028,7 +954,7 @@ class DashboardScreen extends StatelessWidget {
                 color: color.withAlpha(20),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, color: color, size: 22),
+              child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 12),
             Text(
@@ -1036,7 +962,7 @@ class DashboardScreen extends StatelessWidget {
               style: GoogleFonts.outfit(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 14,
+                fontSize: 13,
               ),
               textAlign: TextAlign.center,
             ),
