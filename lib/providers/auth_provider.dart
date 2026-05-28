@@ -14,7 +14,7 @@ class AuthProvider with ChangeNotifier {
   String? _authError;
   
   // Backend connection url
-  final String backendUrl = 'http://localhost:5000'; // Target local Flask server
+  final String backendUrl = 'http://localhost:5001'; // Target local Flask server
 
   // Core Systems
   bool _isOnline = true;
