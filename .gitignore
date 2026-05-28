@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Lanka Go Private Credentials
+backend/firebase-key.json
+
