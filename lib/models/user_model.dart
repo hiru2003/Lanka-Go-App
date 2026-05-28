@@ -7,6 +7,8 @@ class UserModel {
   final double dailyCap;
   final String status; // 'Active' or 'Suspended'
   final String cardNumber;
+  final String userType; // 'Student' or 'Standard'
+  final bool isFrozen;
 
   UserModel({
     required this.id,
@@ -17,10 +19,12 @@ class UserModel {
     required this.dailyCap,
     required this.status,
     required this.cardNumber,
+    this.userType = 'Standard',
+    this.isFrozen = false,
   });
 
   /// Factory constructor to parse a UserModel from a scanned QR payload.
-  /// Payload format: LANKAGO:USER:id:name:email:balance:dailySpent:dailyCap:status:cardNumber
+  /// Payload format: LANKAGO:USER:id:name:email:balance:dailySpent:dailyCap:status:cardNumber:userType:isFrozen
   factory UserModel.fromQRString(String qrString) {
     final parts = qrString.split(':');
     if (parts.length < 10) {
@@ -36,6 +40,8 @@ class UserModel {
       dailyCap: double.tryParse(parts[7]) ?? 100.0,
       status: parts[8],
       cardNumber: parts[9],
+      userType: parts.length > 10 ? parts[10] : 'Standard',
+      isFrozen: parts.length > 11 ? (parts[11] == 'true') : false,
     );
   }
 
@@ -49,6 +55,8 @@ class UserModel {
     double? dailyCap,
     String? status,
     String? cardNumber,
+    String? userType,
+    bool? isFrozen,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -59,6 +67,8 @@ class UserModel {
       dailyCap: dailyCap ?? this.dailyCap,
       status: status ?? this.status,
       cardNumber: cardNumber ?? this.cardNumber,
+      userType: userType ?? this.userType,
+      isFrozen: isFrozen ?? this.isFrozen,
     );
   }
 
@@ -72,6 +82,8 @@ class UserModel {
       'dailyCap': dailyCap,
       'status': status,
       'cardNumber': cardNumber,
+      'userType': userType,
+      'isFrozen': isFrozen,
     };
   }
 }

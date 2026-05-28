@@ -4,6 +4,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/glassmorphic_card.dart';
+import '../models/user_model.dart';
+import '../models/transaction_model.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -53,7 +55,7 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'Select an amount to simulate reloading your Lanka Go card.',
+                  'Simulated online payment gateway deposit. Enter reload amount to proceed.',
                   style: GoogleFonts.inter(
                     color: Colors.white60,
                     fontSize: 14,
@@ -61,7 +63,7 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 24),
                 
-                // Segmented Reload Grid
+                // Grid of reload amounts
                 GridView.count(
                   shrinkWrap: true,
                   crossAxisCount: 2,
@@ -71,18 +73,35 @@ class DashboardScreen extends StatelessWidget {
                   physics: const NeverScrollableScrollPhysics(),
                   children: reloadAmounts.map((amount) {
                     return InkWell(
-                      onTap: () {
-                        authProvider.reloadBalance(amount);
+                      onTap: () async {
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              'Successfully reloaded ${langProvider.translate('lkr')} ${amount.toStringAsFixed(2)}!',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            backgroundColor: const Color(0xFF00E676),
+                        
+                        // Show simulated payment loader
+                        showDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          builder: (context) => const Center(
+                            child: CircularProgressIndicator(color: Color(0xFF00F2FE)),
                           ),
                         );
+
+                        final success = await authProvider.reloadBalanceWithGateway(amount);
+                        
+                        if (context.mounted) {
+                          Navigator.pop(context); // Dismiss loader
+                        }
+
+                        if (success && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Payment Successful! Reloaded ${langProvider.translate('lkr')} ${amount.toStringAsFixed(2)} to card.',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              backgroundColor: const Color(0xFF00E676),
+                            ),
+                          );
+                        }
                       },
                       child: Container(
                         decoration: BoxDecoration(
@@ -112,9 +131,11 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  /// Displays the recent travel history popup list
+  /// Displays the travel history timeline list
   void _showHistoryModal(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final history = authProvider.travelHistory;
 
     showModalBottomSheet(
       context: context,
@@ -126,27 +147,6 @@ class DashboardScreen extends StatelessWidget {
         ),
       ),
       builder: (context) {
-        final List<Map<String, dynamic>> trips = [
-          {
-            'route': 'Route 138 - Pettah to Maharagama',
-            'time': 'Today, 08:32 AM',
-            'fare': 40.0,
-            'bus': 'LK-NC-4829',
-          },
-          {
-            'route': 'Route 120 - Colombo to Horana',
-            'time': 'Yesterday, 05:14 PM',
-            'fare': 55.0,
-            'bus': 'LK-ND-9182',
-          },
-          {
-            'route': 'Route 177 - Kollupitiya to Kaduwela',
-            'time': '26 May, 07:10 AM',
-            'fare': 35.0,
-            'bus': 'LK-NB-1092',
-          },
-        ];
-
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
@@ -175,65 +175,81 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: trips.length,
-                  separatorBuilder: (context, index) => Divider(color: Colors.white.withAlpha(20)),
-                  itemBuilder: (context, index) {
-                    final trip = trips[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
+                if (history.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      child: Text(
+                        'No travel records found.',
+                        style: GoogleFonts.inter(color: Colors.white30),
+                      ),
+                    ),
+                  )
+                else
+                  Expanded(
+                    child: ListView.separated(
+                      itemCount: history.length,
+                      separatorBuilder: (context, index) => Divider(color: Colors.white.withAlpha(20)),
+                      itemBuilder: (context, index) {
+                        final trip = history[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withAlpha(10),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.directions_bus, color: Color(0xFF00F2FE), size: 20),
-                              ),
-                              const SizedBox(width: 14),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+                              Row(
                                 children: [
-                                  Text(
-                                    trip['route'],
-                                    style: GoogleFonts.inter(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(10),
+                                      shape: BoxShape.circle,
                                     ),
+                                    child: const Icon(Icons.directions_bus, color: Color(0xFF00F2FE), size: 20),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${trip['time']} • ${trip['bus']}',
-                                    style: GoogleFonts.inter(
-                                      color: Colors.white38,
-                                      fontSize: 11,
-                                    ),
+                                  const SizedBox(width: 14),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        trip.route,
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            '${trip.busId} • ',
+                                            style: GoogleFonts.inter(
+                                              color: Colors.white38,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                          _buildSyncBadge(trip),
+                                        ],
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
+                              Text(
+                                '- ${langProvider.translate('lkr')} ${trip.fare.toStringAsFixed(2)}',
+                                style: GoogleFonts.shareTechMono(
+                                  color: const Color(0xFFFFB300),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
                             ],
                           ),
-                          Text(
-                            '- ${langProvider.translate('lkr')} ${trip['fare'].toStringAsFixed(2)}',
-                            style: GoogleFonts.shareTechMono(
-                              color: const Color(0xFFFFB300),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                        );
+                      },
+                    ),
+                  ),
                 const SizedBox(height: 12),
               ],
             ),
@@ -243,24 +259,66 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
+  /// Builds the small inline badge tag indicating transaction validation state
+  Widget _buildSyncBadge(TransactionModel trip) {
+    if (trip.isOffline && !trip.isSynced) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.orange.withAlpha(30),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.orange, width: 0.5),
+        ),
+        child: const Text(
+          'OFFLINE',
+          style: TextStyle(color: Colors.orange, fontSize: 8, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+    
+    if (trip.isOffline && trip.isSynced) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.teal.withAlpha(30),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.teal, width: 0.5),
+        ),
+        child: const Text(
+          'SYNCED',
+          style: TextStyle(color: Colors.teal, fontSize: 8, fontWeight: FontWeight.bold),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: const Color(0xFF00F2FE).withAlpha(20),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF00F2FE), width: 0.5),
+      ),
+      child: const Text(
+        'ONLINE',
+        style: TextStyle(color: Color(0xFF00F2FE), fontSize: 8, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     final langProvider = Provider.of<LanguageProvider>(context);
-
-    // Get current logged-in user or provide fallback mock
     final user = authProvider.currentUser;
     final size = MediaQuery.of(context).size;
 
     if (user == null) {
-      // Fallback redirection to login just in case
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushReplacementNamed(context, '/login');
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    // Daily Cap Math
     final double capProgress = (user.dailySpent / user.dailyCap).clamp(0.0, 1.0);
     final isCapReached = user.dailySpent >= user.dailyCap;
 
@@ -286,19 +344,47 @@ class DashboardScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Dashboard Header / Top profile bar
+                  // Header Block
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Ayubowan,',
-                            style: GoogleFonts.outfit(
-                              color: Colors.white54,
-                              fontSize: 16,
-                            ),
+                          Row(
+                            children: [
+                              Text(
+                                'Ayubowan, ',
+                                style: GoogleFonts.outfit(
+                                  color: Colors.white54,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              // Network visual label
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: authProvider.isOnline ? const Color(0xFF00E676) : Colors.red,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: authProvider.isOnline ? const Color(0xFF00E676).withAlpha(120) : Colors.red.withAlpha(120),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                authProvider.isOnline ? 'Online' : 'Offline Mode',
+                                style: GoogleFonts.inter(
+                                  color: authProvider.isOnline ? Colors.white30 : Colors.red,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
                           Text(
                             user.name,
@@ -311,7 +397,6 @@ class DashboardScreen extends StatelessWidget {
                         ],
                       ),
                       
-                      // Small interactive avatar navigating to Profile
                       GestureDetector(
                         onTap: () => Navigator.pushNamed(context, '/profile'),
                         child: Container(
@@ -321,12 +406,6 @@ class DashboardScreen extends StatelessWidget {
                               color: const Color(0xFF00F2FE),
                               width: 2,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF00F2FE).withAlpha(60),
-                                blurRadius: 10,
-                              ),
-                            ],
                           ),
                           child: CircleAvatar(
                             radius: 24,
@@ -345,177 +424,226 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                   
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
 
-                  // Smart Card Visual Component
-                  InkWell(
-                    onTap: () {
-                      // Secret tap feature: simulate riding a bus costing LKR 20.00
-                      authProvider.deductTrip(20.0);
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(isCapReached 
-                            ? 'Daily Cap reached! This trip is free.' 
-                            : 'Simulated bus trip check-in. Deducted LKR 20.00'),
-                          backgroundColor: isCapReached ? const Color(0xFF00F2FE) : const Color(0xFFFFB300),
-                          duration: const Duration(seconds: 1),
-                        ),
-                      );
-                    },
-                    child: GlassmorphicCard(
-                      borderRadius: 24,
-                      gradientColors: [
-                        const Color(0xFF1E1B4B).withAlpha(180), // Deep blue-violet
-                        const Color(0xFF0F172A).withAlpha(120), // Dark slate
-                      ],
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  // 1. LOW BALANCE NOTIFICATION SYSTEM
+                  if (authProvider.isLowBalance)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 20),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withAlpha(20),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.orange.withAlpha(100), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.orange.withAlpha(10),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.waves, color: Color(0xFF00F2FE), size: 28),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'LANKA GO PASS',
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                        letterSpacing: 1.5,
-                                      ),
-                                    ),
-                                  ],
+                                const Text(
+                                  'Low Balance Warning!',
+                                  style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 14),
                                 ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: user.status.toLowerCase() == 'active'
-                                        ? const Color(0xFF00E676).withAlpha(30)
-                                        : Colors.redAccent.withAlpha(30),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(
-                                      color: user.status.toLowerCase() == 'active'
-                                          ? const Color(0xFF00E676)
-                                          : Colors.redAccent,
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: Row(
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Your balance is below LKR 100.00. Please reload.',
+                                  style: GoogleFonts.inter(color: Colors.white70, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              backgroundColor: Colors.orange.withAlpha(40),
+                              foregroundColor: Colors.orange,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            onPressed: () => _showReloadModal(context),
+                            child: const Text('RELOAD', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Visual Smart Card Display
+                  Stack(
+                    children: [
+                      GlassmorphicCard(
+                        borderRadius: 24,
+                        gradientColors: [
+                          const Color(0xFF1E1B4B).withAlpha(180),
+                          const Color(0xFF0F172A).withAlpha(120),
+                        ],
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
                                     children: [
-                                      Container(
-                                        width: 6,
-                                        height: 6,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: user.status.toLowerCase() == 'active'
-                                              ? const Color(0xFF00E676)
-                                              : Colors.redAccent,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
+                                      const Icon(Icons.waves, color: Color(0xFF00F2FE), size: 28),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        langProvider.translate(user.status.toLowerCase()),
-                                        style: TextStyle(
-                                          color: user.status.toLowerCase() == 'active'
-                                              ? const Color(0xFF00E676)
-                                              : Colors.redAccent,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 11,
+                                        'LANKA GO PASS',
+                                        style: GoogleFonts.outfit(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                          letterSpacing: 1.5,
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
-                            ),
-                            
-                            const SizedBox(height: 36),
-
-                            Text(
-                              langProvider.translate('balance'),
-                              style: GoogleFonts.inter(
-                                color: Colors.white38,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
+                                  
+                                  // User Type student tag
+                                  if (user.userType == 'Student')
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFB300).withAlpha(40),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: const Color(0xFFFFB300), width: 1),
+                                      ),
+                                      child: const Text(
+                                        'STUDENT',
+                                        style: TextStyle(
+                                          color: Color(0xFFFFB300),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${langProvider.translate('lkr')} ${user.balance.toStringAsFixed(2)}',
-                              style: GoogleFonts.shareTechMono(
-                                color: const Color(0xFFFFFFFF),
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold,
+                              
+                              const SizedBox(height: 32),
+
+                              Text(
+                                langProvider.translate('balance'),
+                                style: GoogleFonts.inter(
+                                  color: Colors.white38,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-
-                            const SizedBox(height: 28),
-
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'CARD HOLDER',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white24,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      user.name.toUpperCase(),
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white70,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
+                              const SizedBox(height: 4),
+                              Text(
+                                '${langProvider.translate('lkr')} ${user.balance.toStringAsFixed(2)}',
+                                style: GoogleFonts.shareTechMono(
+                                  color: const Color(0xFFFFFFFF),
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'CARD ID',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white24,
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1,
+                              ),
+
+                              const SizedBox(height: 28),
+
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'CARD HOLDER',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white24,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      user.cardNumber,
-                                      style: GoogleFonts.shareTechMono(
-                                        color: Colors.white70,
-                                        fontSize: 13,
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        user.name.toUpperCase(),
+                                        style: GoogleFonts.outfit(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ],
+                                    ],
+                                  ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        'CARD ID',
+                                        style: GoogleFonts.inter(
+                                          color: Colors.white24,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        user.cardNumber,
+                                        style: GoogleFonts.shareTechMono(
+                                          color: Colors.white70,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                      
+                      // 2. FREEZE CARD BLOCKED OVERLAY SHIELD
+                      if (user.isFrozen)
+                        Positioned.fill(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(24),
+                            child: Container(
+                              color: Colors.red.withAlpha(200),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.ac_unit, color: Colors.white, size: 48),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'CARD FROZEN',
+                                    style: GoogleFonts.outfit(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 24,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Transactions blocked. Unfreeze card to use.',
+                                    style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
-                  // Daily Cap Progress Component
+                  // Daily Cap Progress Widget
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20.0),
@@ -556,15 +684,11 @@ class DashboardScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         
-                        // Custom colorful progress meter
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Stack(
                             children: [
-                              Container(
-                                height: 8,
-                                color: Colors.white.withAlpha(20),
-                              ),
+                              Container(height: 8, color: Colors.white.withAlpha(20)),
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 500),
                                 height: 8,
@@ -579,8 +703,6 @@ class DashboardScreen extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        
-                        // Captions
                         Text(
                           isCapReached
                               ? 'Daily capping reached! Your transit trips are free for today.'
@@ -594,9 +716,14 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 24),
 
-                  // Actions Section Label
+                  // 3. INTERACTIVE DEVELOPER TESTING PANEL
+                  _buildDevTestingPanel(context, authProvider, user),
+
+                  const SizedBox(height: 28),
+
+                  // Quick Actions row
                   Padding(
                     padding: const EdgeInsets.only(left: 4.0, bottom: 16.0),
                     child: Text(
@@ -610,7 +737,6 @@ class DashboardScreen extends StatelessWidget {
                     ),
                   ),
 
-                  // Action Buttons Row (Reload & History)
                   Row(
                     children: [
                       Expanded(
@@ -637,7 +763,6 @@ class DashboardScreen extends StatelessWidget {
                   
                   const SizedBox(height: 16),
                   
-                  // Profile Full Width Tile
                   _buildActionTile(
                     context: context,
                     label: langProvider.translate('profile'),
@@ -657,7 +782,224 @@ class DashboardScreen extends StatelessWidget {
     );
   }
 
-  /// Builds a premium visual button tile for dashboard activities
+  /// Builds the visual testing panel widget allowing quick switches of states
+  Widget _buildDevTestingPanel(BuildContext context, AuthProvider authProvider, UserModel user) {
+    final unsyncedCount = authProvider.offlineService.unsyncedCount;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B).withAlpha(120),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFF00F2FE).withAlpha(80), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'CORE USE CASE SIMULATOR',
+                style: GoogleFonts.outfit(
+                  color: const Color(0xFF00F2FE),
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              if (unsyncedCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withAlpha(45),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$unsyncedCount Unsynced',
+                    style: const TextStyle(color: Colors.orange, fontSize: 10, fontWeight: FontWeight.bold),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Interactive toggles row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 1. Connection toggle
+              _buildDevToggle(
+                label: 'Network',
+                value: authProvider.isOnline ? 'Online' : 'Offline',
+                activeColor: authProvider.isOnline ? const Color(0xFF00E676) : Colors.red,
+                onTap: () => authProvider.setNetworkState(!authProvider.isOnline),
+              ),
+              
+              // 2. Student type toggle
+              _buildDevToggle(
+                label: 'Type',
+                value: user.userType,
+                activeColor: user.userType == 'Student' ? const Color(0xFFFFB300) : Colors.white,
+                onTap: () => authProvider.toggleUserType(),
+              ),
+
+              // 3. Freeze toggle
+              _buildDevToggle(
+                label: 'Freeze Card',
+                value: user.isFrozen ? 'Frozen' : 'Active',
+                activeColor: user.isFrozen ? Colors.red : const Color(0xFF00E676),
+                onTap: () => authProvider.setFreezeState(!user.isFrozen),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Action simulation triggers
+          Row(
+            children: [
+              // Simulate Trip button
+              Expanded(
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF020617),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: BorderSide(color: Colors.white.withAlpha(20)),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () {
+                    // Try processing trip with standard cost LKR 50.00
+                    final success = authProvider.processBusTrip(
+                      baseFare: 50.0,
+                      routeName: 'Route 138 - Pettah to Maharagama',
+                      busId: 'LK-NC-4829',
+                    );
+                    
+                    if (success) {
+                      final double charge = user.userType == 'Student' ? 25.0 : 50.0;
+                      final modeStr = authProvider.isOnline ? 'Online' : 'Offline validator';
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Success! Bus Check-in complete. Charged LKR ${charge.toStringAsFixed(2)} via $modeStr.',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          backgroundColor: const Color(0xFF00E676),
+                        ),
+                      );
+                    } else {
+                      String failReason = 'Transaction rejected: insufficient balance.';
+                      if (user.isFrozen) {
+                        failReason = 'Transaction rejected: card is frozen!';
+                      }
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(failReason, style: const TextStyle(fontWeight: FontWeight.bold)),
+                          backgroundColor: Colors.redAccent,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.directions_bus_filled_outlined, size: 16),
+                  label: const Text('Deduct trip (LKR 50)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              
+              // Force synchronization button
+              if (unsyncedCount > 0) ...[
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E676).withAlpha(30),
+                    foregroundColor: const Color(0xFF00E676),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      side: const BorderSide(color: Color(0xFF00E676)),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: !authProvider.isOnline 
+                      ? () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Cannot sync: connection is offline.'),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                        }
+                      : () async {
+                          // Show sync indicator dialog
+                          showDialog(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (context) => const Center(
+                              child: CircularProgressIndicator(color: Color(0xFF00E676)),
+                            ),
+                          );
+                          
+                          await authProvider.syncOfflineTransactions();
+                          
+                          if (context.mounted) {
+                            Navigator.pop(context); // Dismiss loader
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Sync Complete! Unsynced offline logs uploaded to server.'),
+                                backgroundColor: Color(0xFF00E676),
+                              ),
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.cloud_sync_outlined, size: 16),
+                  label: const Text('Sync Logs', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Helper to build small clickable state modifiers inside Dev simulator card
+  Widget _buildDevToggle({
+    required String label,
+    required String value,
+    required Color activeColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(8),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: activeColor.withAlpha(60)),
+            ),
+            child: Text(
+              value,
+              style: GoogleFonts.inter(color: activeColor, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildActionTile({
     required BuildContext context,
     required String label,

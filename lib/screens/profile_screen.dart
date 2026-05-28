@@ -16,7 +16,6 @@ class ProfileScreen extends StatelessWidget {
     final user = authProvider.currentUser;
 
     if (user == null) {
-      // Security fallback redirect
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushReplacementNamed(context, '/login');
       });
@@ -69,12 +68,12 @@ class ProfileScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: const Color(0xFF00F2FE),
+                        color: user.isFrozen ? Colors.red : const Color(0xFF00F2FE),
                         width: 3,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF00F2FE).withAlpha(50),
+                          color: user.isFrozen ? Colors.red.withAlpha(50) : const Color(0xFF00F2FE).withAlpha(50),
                           blurRadius: 20,
                           spreadRadius: 2,
                         ),
@@ -86,7 +85,7 @@ class ProfileScreen extends StatelessWidget {
                       child: Text(
                         user.name.isNotEmpty ? user.name[0] : 'U',
                         style: GoogleFonts.outfit(
-                          color: const Color(0xFF00F2FE),
+                          color: user.isFrozen ? Colors.red : const Color(0xFF00F2FE),
                           fontWeight: FontWeight.bold,
                           fontSize: 42,
                         ),
@@ -95,7 +94,7 @@ class ProfileScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
 
-                  // User name and email
+                  // Name & Email
                   Text(
                     user.name,
                     style: GoogleFonts.outfit(
@@ -115,7 +114,7 @@ class ProfileScreen extends StatelessWidget {
                   
                   const SizedBox(height: 36),
 
-                  // Settings Section Card
+                  // Settings Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(24),
@@ -138,7 +137,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 20),
                         
-                        // Card ID read-only field
+                        // Card ID
                         _buildProfileField(
                           label: langProvider.translate('cardNumber'),
                           value: user.cardNumber,
@@ -146,7 +145,7 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         Divider(color: Colors.white.withAlpha(15), height: 32),
 
-                        // Card Status read-only field
+                        // Card Status
                         _buildProfileField(
                           label: langProvider.translate('cardStatus'),
                           value: langProvider.translate(user.status.toLowerCase()),
@@ -157,7 +156,71 @@ class ProfileScreen extends StatelessWidget {
                         ),
                         Divider(color: Colors.white.withAlpha(15), height: 32),
 
-                        // Language Segmented Control Selector
+                        // Classification Type (Student/Standard)
+                        _buildProfileField(
+                          label: 'Passenger Classification',
+                          value: user.userType,
+                          icon: Icons.assignment_ind_outlined,
+                          valueColor: user.userType == 'Student'
+                              ? const Color(0xFFFFB300)
+                              : Colors.white,
+                        ),
+                        Divider(color: Colors.white.withAlpha(15), height: 32),
+
+                        // Card Freezing Switch Control
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.ac_unit, color: user.isFrozen ? Colors.red : Colors.white54, size: 20),
+                                const SizedBox(width: 14),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Freeze Card',
+                                      style: GoogleFonts.inter(
+                                        color: Colors.white30,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      user.isFrozen ? 'Card Frozen' : 'Card Active',
+                                      style: GoogleFonts.inter(
+                                        color: user.isFrozen ? Colors.red : Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Switch(
+                              value: user.isFrozen,
+                              activeThumbColor: Colors.red,
+                              onChanged: (val) {
+                                authProvider.setFreezeState(val);
+                                ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      val ? 'Card Frozen successfully!' : 'Card Unfrozen successfully!',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    backgroundColor: val ? Colors.redAccent : const Color(0xFF00E676),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        Divider(color: Colors.white.withAlpha(15), height: 32),
+
+                        // Language Selector
                         LanguageSelector(isCompact: false),
                       ],
                     ),
@@ -165,7 +228,7 @@ class ProfileScreen extends StatelessWidget {
 
                   const SizedBox(height: 48),
 
-                  // Log Out Button
+                  // Log Out
                   CustomActionButton(
                     text: langProvider.translate('logout'),
                     icon: Icons.logout,
@@ -221,7 +284,7 @@ class ProfileScreen extends StatelessWidget {
               value,
               style: GoogleFonts.inter(
                 color: valueColor ?? Colors.white,
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
               ),
             ),
