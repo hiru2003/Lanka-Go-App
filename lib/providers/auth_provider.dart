@@ -98,7 +98,7 @@ class AuthProvider with ChangeNotifier {
             userId: user.id,
             type: 'travel',
             amount: user.accountType == 'student' ? -20.0 : -40.0,
-            timestamp: DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+            timestamp: DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
             route: 'Route 138 - Pettah to Maharagama',
             busId: 'LK-NC-4829',
             isOffline: false,
