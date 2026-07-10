@@ -6,6 +6,7 @@ import 'providers/auth_provider.dart';
 import 'providers/language_provider.dart';
 import 'providers/bus_routes_provider.dart';
 import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/reload_screen.dart';
@@ -71,6 +72,7 @@ class LankaGoApp extends StatelessWidget {
       initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/profile': (context) => const ProfileScreen(),
         '/reload': (context) => const ReloadScreen(),

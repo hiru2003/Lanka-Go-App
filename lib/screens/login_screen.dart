@@ -21,6 +21,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   late Animation<double> _pulseAnimation;
   String? _scanErrorMessage;
 
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
   @override
   void initState() {
     super.initState();
@@ -37,6 +41,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   void dispose() {
     _pulseController.dispose();
     _scannerController?.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -131,6 +137,66 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     }
   }
 
+  void _loginWithEmail() async {
+    if (!_formKey.currentState!.validate()) return;
+    
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFF00F2FE),
+        ),
+      ),
+    );
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final success = await authProvider.loginWithEmail(email, password);
+    
+    if (mounted) {
+      Navigator.pop(context); // Dismiss loader
+    }
+
+    if (success) {
+      if (mounted) {
+        Navigator.pushReplacementNamed(context, '/dashboard');
+      }
+    } else {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Color(0xFFEF4444)),
+                const SizedBox(width: 10),
+                const Text(
+                  'Login Failed',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            content: Text(
+              authProvider.authError ?? 'Invalid email or password.',
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK', style: TextStyle(color: Color(0xFF00F2FE), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   /// Bypass scan for local development/simulator testing
   void _bypassScan() async {
     // Format: LANKAGO:USER:id:name:email:balance:phone:status:accountType:cardNumber
@@ -189,73 +255,76 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Top bar with App Name & Language Selector
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Top bar with App Name & Language Selector
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+                              ),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            borderRadius: BorderRadius.circular(12),
+                            child: const Icon(Icons.airport_shuttle, color: Colors.white, size: 24),
                           ),
-                          child: const Icon(Icons.airport_shuttle, color: Colors.white, size: 24),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          langProvider.translate('appName'),
-                          style: GoogleFonts.outfit(
-                            fontSize: 22,
+                          const SizedBox(width: 10),
+                          Text(
+                            langProvider.translate('appName'),
+                            style: GoogleFonts.outfit(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      LanguageSelector(isCompact: true),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 24),
+
+                  // Central Card Body
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    child: _isScanning ? _buildScannerView(size) : _buildSplashView(size, langProvider),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Bottom Dev Bypass Button
+                  if (!_isScanning) ...[
+                    Opacity(
+                      opacity: 0.6,
+                      child: TextButton.icon(
+                        onPressed: _bypassScan,
+                        icon: const Icon(Icons.developer_mode, color: Color(0xFFFFB300), size: 16),
+                        label: Text(
+                          langProvider.translate('bypassScan'),
+                          style: GoogleFonts.inter(
+                            color: const Color(0xFFFFB300),
+                            fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            decoration: TextDecoration.underline,
                           ),
-                        ),
-                      ],
-                    ),
-                    LanguageSelector(isCompact: true),
-                  ],
-                ),
-                
-                const Spacer(),
-
-                // Central Card Body
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
-                  child: _isScanning ? _buildScannerView(size) : _buildSplashView(size, langProvider),
-                ),
-
-                const Spacer(),
-
-                // Bottom Dev Bypass Button
-                if (!_isScanning) ...[
-                  Opacity(
-                    opacity: 0.6,
-                    child: TextButton.icon(
-                      onPressed: _bypassScan,
-                      icon: const Icon(Icons.developer_mode, color: Color(0xFFFFB300), size: 16),
-                      label: Text(
-                        langProvider.translate('bypassScan'),
-                        style: GoogleFonts.inter(
-                          color: const Color(0xFFFFB300),
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -265,138 +334,249 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   /// Splash welcome layout
   Widget _buildSplashView(Size size, LanguageProvider langProvider) {
-    return Column(
-      key: const ValueKey('splash_view'),
-      children: [
-        // Premium Card Graphic
-        Container(
-          height: 190,
-          width: size.width * 0.8,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1E293B),
-                Color(0xFF0F172A),
+    return Form(
+      key: _formKey,
+      child: Column(
+        key: const ValueKey('splash_view'),
+        children: [
+          // Premium Card Graphic
+          Container(
+            height: 170,
+            width: size.width * 0.8,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1E293B),
+                  Color(0xFF0F172A),
+                ],
+              ),
+              border: Border.all(color: Colors.white.withAlpha(20), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00F2FE).withAlpha(10),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                )
               ],
             ),
-            border: Border.all(color: Colors.white.withAlpha(20), width: 1.5),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF00F2FE).withAlpha(10),
-                blurRadius: 30,
-                spreadRadius: 5,
-              )
-            ],
-          ),
-          child: Stack(
-            children: [
-              // Abstract vector curves
-              Positioned(
-                right: -20,
-                top: -20,
-                child: CircleAvatar(
-                  radius: 70,
-                  backgroundColor: const Color(0xFF00F2FE).withAlpha(10),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -20,
+                  top: -20,
+                  child: CircleAvatar(
+                    radius: 70,
+                    backgroundColor: const Color(0xFF00F2FE).withAlpha(10),
+                  ),
                 ),
-              ),
-              Positioned(
-                left: -30,
-                bottom: -30,
-                child: CircleAvatar(
-                  radius: 80,
-                  backgroundColor: const Color(0xFFFFB300).withAlpha(5),
+                Positioned(
+                  left: -30,
+                  bottom: -30,
+                  child: CircleAvatar(
+                    radius: 80,
+                    backgroundColor: const Color(0xFFFFB300).withAlpha(5),
+                  ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Icon(Icons.contactless_outlined, color: Color(0xFF00F2FE), size: 32),
-                        Text(
-                          'LANKA GO SMART',
-                          style: GoogleFonts.outfit(
-                            color: Colors.white54,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.5,
-                            fontSize: 10,
+                Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Icon(Icons.contactless_outlined, color: Color(0xFF00F2FE), size: 28),
+                          Text(
+                            'LANKA GO SMART',
+                            style: GoogleFonts.outfit(
+                              color: Colors.white54,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.5,
+                              fontSize: 10,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '•••• •••• •••• 8472',
-                          style: GoogleFonts.shareTechMono(
-                            color: Colors.white,
-                            fontSize: 22,
-                            letterSpacing: 2,
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '•••• •••• •••• 8472',
+                            style: GoogleFonts.shareTechMono(
+                              color: Colors.white,
+                              fontSize: 20,
+                              letterSpacing: 2,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          langProvider.translate('tagline'),
-                          style: GoogleFonts.inter(
-                            color: Colors.white38,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(height: 4),
+                          Text(
+                            langProvider.translate('tagline'),
+                            style: GoogleFonts.inter(
+                              color: Colors.white38,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        
-        const SizedBox(height: 48),
-
-        // Text labels
-        Text(
-          langProvider.translate('loginTitle'),
-          textAlign: TextAlign.center,
-          style: GoogleFonts.outfit(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Text(
-            langProvider.translate('loginSubtitle'),
-            textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.white54,
-              height: 1.5,
+              ],
             ),
           ),
-        ),
-        
-        const SizedBox(height: 40),
+          
+          const SizedBox(height: 24),
 
-        // Core CTA Button
-        CustomActionButton(
-          text: langProvider.translate('scanButton'),
-          icon: Icons.qr_code_scanner,
-          gradient: const [Color(0xFF00F2FE), Color(0xFF4FACFE)],
-          onPressed: _startScanning,
-          width: size.width * 0.75,
-        ),
-      ],
+          Text(
+            'Sign In',
+            style: GoogleFonts.outfit(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Enter your credentials or scan your NFC/QR card to continue',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: Colors.white54,
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+
+          // Email Field
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF00F2FE)),
+              labelText: 'Email Address',
+              labelStyle: const TextStyle(color: Colors.white54),
+              filled: true,
+              fillColor: const Color(0xFF1E293B),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF00F2FE), width: 1.5),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return 'Please enter your email';
+              }
+              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value.trim())) {
+                return 'Please enter a valid email address';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 16),
+
+          // Password Field
+          TextFormField(
+            controller: _passwordController,
+            obscureText: true,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF00F2FE)),
+              labelText: 'Password',
+              labelStyle: const TextStyle(color: Colors.white54),
+              filled: true,
+              fillColor: const Color(0xFF1E293B),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF00F2FE), width: 1.5),
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your password';
+              }
+              if (value.length < 6) {
+                return 'Password must be at least 6 characters';
+              }
+              return null;
+            },
+          ),
+          
+          const SizedBox(height: 20),
+
+          // Sign In Action Button
+          CustomActionButton(
+            text: 'Sign In',
+            icon: Icons.login,
+            gradient: const [Color(0xFF00F2FE), Color(0xFF4FACFE)],
+            onPressed: _loginWithEmail,
+            width: double.infinity,
+            height: 50,
+          ),
+
+          const SizedBox(height: 16),
+          
+          // Sign Up Link
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("Don't have an account? ", style: TextStyle(color: Colors.white54)),
+              GestureDetector(
+                onTap: () {
+                  Navigator.pushNamed(context, '/register');
+                },
+                child: const Text(
+                  'Sign Up',
+                  style: TextStyle(
+                    color: Color(0xFF00F2FE),
+                    fontWeight: FontWeight.bold,
+                    decoration: TextDecoration.underline,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // OR Divider
+          Row(
+            children: const [
+              Expanded(child: Divider(color: Colors.white24)),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text('OR', style: TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+              Expanded(child: Divider(color: Colors.white24)),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Scan Card Button
+          CustomActionButton(
+            text: langProvider.translate('scanButton'),
+            icon: Icons.qr_code_scanner,
+            gradient: const [Color(0xFF1E293B), Color(0xFF0F172A)],
+            onPressed: _startScanning,
+            width: double.infinity,
+            height: 50,
+          ),
+        ],
+      ),
     );
   }
 

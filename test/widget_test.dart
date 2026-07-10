@@ -10,8 +10,8 @@ void main() {
     // Verify that the App Title 'Lanka Go' is present.
     expect(find.text('Lanka Go'), findsOneWidget);
 
-    // Verify that the splash login title 'Scan to Board' is present.
-    expect(find.text('Scan to Board'), findsOneWidget);
+    // Verify that the splash login title 'Sign In' and the button are present.
+    expect(find.text('Sign In'), findsNWidgets(2));
 
     // Verify that a scan button is rendered.
     expect(find.byType(GestureDetector), findsWidgets);

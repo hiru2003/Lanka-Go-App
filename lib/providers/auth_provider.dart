@@ -67,6 +67,125 @@ class AuthProvider with ChangeNotifier {
     await _sqliteService.database;
   }
 
+  Future<bool> registerWithEmail({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+    required String accountType,
+    required String cardNumber,
+  }) async {
+    _isAuthenticating = true;
+    _authError = null;
+    notifyListeners();
+
+    try {
+      await initDatabaseCache();
+
+      final response = await http.post(
+        Uri.parse('$backendUrl/api/auth/register'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'email': email,
+          'password': password,
+          'phone': phone,
+          'accountType': accountType,
+          'cardNumber': cardNumber,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final user = UserModel.fromJson(data['user']);
+          _currentUser = user;
+          await _sqliteService.updateCachedUser(user.id, user.balance);
+
+          _travelHistory.clear();
+          _isAuthenticating = false;
+          notifyListeners();
+          return true;
+        } else {
+          _authError = data['error'] ?? 'Registration failed.';
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        _authError = data['error'] ?? 'Server returned code: ${response.statusCode}';
+      }
+    } catch (e) {
+      _authError = 'Connection failed: ${e.toString()}';
+    }
+
+    _isAuthenticating = false;
+    notifyListeners();
+    return false;
+  }
+
+  Future<bool> loginWithEmail(String email, String password) async {
+    _isAuthenticating = true;
+    _authError = null;
+    notifyListeners();
+
+    try {
+      await initDatabaseCache();
+
+      final response = await http.post(
+        Uri.parse('$backendUrl/api/auth/login'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
+      ).timeout(const Duration(seconds: 8));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          final user = UserModel.fromJson(data['user']);
+          _currentUser = user;
+          await _sqliteService.updateCachedUser(user.id, user.balance);
+
+          // Get initial user travel history
+          _travelHistory.clear();
+          _travelHistory.addAll([
+            TransactionModel(
+              id: 'tx_init_1',
+              userId: user.id,
+              type: 'travel',
+              amount: user.accountType == 'student' ? -20.0 : -40.0,
+              timestamp: DateTime.now().subtract(const Duration(minutes: 5)).toIso8601String(),
+              route: 'Route 138 - Pettah to Maharagama',
+              busId: 'LK-NC-4829',
+              isOffline: false,
+              isSynced: true,
+            ),
+          ]);
+
+          _isAuthenticating = false;
+          notifyListeners();
+
+          if (isLowBalance) {
+            _triggerLowBalanceAlerts();
+          }
+
+          return true;
+        } else {
+          _authError = data['error'] ?? 'Login failed.';
+        }
+      } else {
+        final data = jsonDecode(response.body);
+        _authError = data['error'] ?? 'Invalid credentials.';
+      }
+    } catch (e) {
+      _authError = 'Connection failed: ${e.toString()}';
+    }
+
+    _isAuthenticating = false;
+    notifyListeners();
+    return false;
+  }
+
   Future<bool> loginWithQR(String qrPayload) async {
     _isAuthenticating = true;
     _authError = null;

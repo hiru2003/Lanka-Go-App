@@ -1,5 +1,7 @@
 import os
 import hashlib
+import urllib.request
+import json
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 
@@ -9,7 +11,7 @@ app = Flask(__name__)
 firebase_initialized = False
 try:
     import firebase_admin
-    from firebase_admin import credentials, firestore
+    from firebase_admin import credentials, firestore, auth
     
     # Check if firebase service account key exists
     cred_path = os.environ.get('FIREBASE_CREDENTIALS_PATH', 'firebase-key.json')
@@ -46,6 +48,12 @@ MOCK_USERS = {
         "accountType": "regular",
         "routes_history": []
     }
+}
+
+# Passwords for simulated users (key: email, value: password)
+MOCK_USER_PASSWORDS = {
+    "mohomed.m@lankago.lk": "password123",
+    "kamal.perera@lankago.lk": "password123"
 }
 
 MOCK_TRANSACTIONS = {
@@ -338,6 +346,134 @@ def sync_offline_transactions():
         "synced_transactions": synced_results,
         "new_balance": balance
     }), 200
+
+
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    data = request.json or {}
+    email = data.get('email', '')
+    password = data.get('password', '')
+    name = data.get('name', '')
+    phone = data.get('phone', '')
+    account_type = data.get('accountType', 'regular')
+    card_number = data.get('cardNumber', '')
+
+    if not email or not password or not name:
+        return jsonify({"error": "Missing required fields (email, password, name)"}), 400
+
+    # Ensure card number is generated if not provided
+    if not card_number:
+        card_number = f"LK-GO-{hashlib.md5(email.encode()).hexdigest()[:8].upper()}"
+
+    if firebase_initialized:
+        try:
+            # Create user in Firebase Authentication
+            user_record = auth.create_user(
+                email=email,
+                password=password,
+                display_name=name,
+                phone_number=phone if phone else None
+            )
+            uid = user_record.uid
+
+            # Create Firestore user document
+            user_data = {
+                "id": uid,
+                "name": name,
+                "email": email,
+                "balance": 100.0,  # initial promo balance
+                "phone": phone,
+                "status": "active",
+                "accountType": account_type,
+                "cardNumber": card_number,
+                "routes_history": []
+            }
+            db.collection('users').document(uid).set(user_data)
+            return jsonify({"success": True, "user": user_data}), 200
+        except Exception as e:
+            return jsonify({"error": f"Firebase Auth Error: {str(e)}"}), 500
+    
+    # Simulator mode
+    # Check if user already exists
+    for u in MOCK_USERS.values():
+        if u['email'] == email:
+            return jsonify({"error": "User with this email already exists"}), 400
+
+    uid = f"usr_{hashlib.md5(email.encode()).hexdigest()[:6]}"
+    user_data = {
+        "id": uid,
+        "name": name,
+        "email": email,
+        "balance": 100.0,
+        "phone": phone,
+        "status": "active",
+        "accountType": account_type,
+        "cardNumber": card_number,
+        "routes_history": []
+    }
+    MOCK_USERS[uid] = user_data
+    MOCK_USER_PASSWORDS[email] = password
+    return jsonify({"success": True, "user": user_data}), 200
+
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    data = request.json or {}
+    email = data.get('email', '')
+    password = data.get('password', '')
+
+    if not email or not password:
+        return jsonify({"error": "Missing email or password"}), 400
+
+    if firebase_initialized:
+        api_key = os.environ.get('FIREBASE_WEB_API_KEY')
+        if api_key:
+            url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key={api_key}"
+            req_data = json.dumps({"email": email, "password": password, "returnSecureToken": True}).encode("utf-8")
+            req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req) as response:
+                    res_body = json.loads(response.read().decode("utf-8"))
+                    uid = res_body.get("localId")
+                    
+                    # Fetch Firestore user document
+                    doc_ref = db.collection('users').document(uid)
+                    doc = doc_ref.get()
+                    if doc.exists:
+                        return jsonify({"success": True, "user": doc.to_dict()}), 200
+                    else:
+                        # Create Firestore document if somehow missing
+                        user_record = auth.get_user(uid)
+                        user_data = {
+                            "id": uid,
+                            "name": user_record.display_name or "Anonymous",
+                            "email": user_record.email,
+                            "balance": 100.0,
+                            "phone": user_record.phone_number or "",
+                            "status": "active",
+                            "accountType": "regular",
+                            "cardNumber": f"LK-GO-{uid[:8].upper()}",
+                            "routes_history": []
+                        }
+                        db.collection('users').document(uid).set(user_data)
+                        return jsonify({"success": True, "user": user_data}), 200
+            except Exception as e:
+                try:
+                    error_msg = json.loads(e.read().decode("utf-8"))['error']['message']
+                except Exception:
+                    error_msg = str(e)
+                return jsonify({"error": f"Firebase Auth Error: {error_msg}"}), 400
+            
+    # Simulator / local fallback password checking
+    for u_id, u in MOCK_USERS.items():
+        if u['email'] == email:
+            stored_password = MOCK_USER_PASSWORDS.get(email)
+            if stored_password == password:
+                return jsonify({"success": True, "user": u}), 200
+            else:
+                return jsonify({"error": "Invalid email or password"}), 400
+
+    return jsonify({"error": "User not found"}), 404
 
 
 if __name__ == '__main__':
