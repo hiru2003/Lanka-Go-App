@@ -71,7 +71,7 @@ class AuthProvider with ChangeNotifier {
     required String name,
     required String email,
     required String password,
-    required String phone,
+    String phone = '',
     required String accountType,
     required String cardNumber,
   }) async {

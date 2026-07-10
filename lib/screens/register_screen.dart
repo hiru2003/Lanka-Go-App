@@ -17,7 +17,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _cardController = TextEditingController();
   
   String _accountType = 'regular'; // 'regular' | 'student'
@@ -33,7 +32,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _phoneController.dispose();
     _cardController.dispose();
     super.dispose();
   }
@@ -53,7 +51,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    final phone = _phoneController.text.trim();
     final cardNumber = _cardController.text.trim();
 
     showDialog(
@@ -71,7 +68,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       name: name,
       email: email,
       password: password,
-      phone: phone,
       accountType: _accountType,
       cardNumber: cardNumber,
     );
@@ -125,8 +121,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-
     return Scaffold(
       body: Container(
         width: double.infinity,
@@ -234,21 +228,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         return null;
                       },
                     ),
-                    const SizedBox(height: 16),
-
-                    // Phone Field
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: _buildInputDecoration('Phone Number', Icons.phone_outlined),
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your phone number';
-                        }
-                        return null;
-                      },
-                    ),
+                    // Phone field removed
                     const SizedBox(height: 16),
 
                     // Card Number Field
