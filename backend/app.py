@@ -4,8 +4,10 @@ import urllib.request
 import json
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
 
 # Try to initialize Firebase Admin SDK
 firebase_initialized = False

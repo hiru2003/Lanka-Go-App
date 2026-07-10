@@ -189,7 +189,7 @@ void main() {
       authProvider.setNetworkState(false);
 
       // Push 500 mock transactions directly to the database
-      final db = await authProvider.sqliteService.database;
+      final db = (await authProvider.sqliteService.database)!;
       
       // Let's add 500 entries to simulate the limit
       await db.transaction((txn) async {
