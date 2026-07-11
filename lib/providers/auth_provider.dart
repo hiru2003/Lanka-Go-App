@@ -1,6 +1,5 @@
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/user_model.dart';
@@ -19,7 +18,7 @@ class AuthProvider with ChangeNotifier {
   String get backendUrl {
     if (kIsWeb) {
       return 'http://localhost:5002';
-    } else if (Platform.isAndroid) {
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
       // 10.0.2.2 is the special IP address to access the host loopback from the Android emulator
       return 'http://10.0.2.2:5002';
     } else {
